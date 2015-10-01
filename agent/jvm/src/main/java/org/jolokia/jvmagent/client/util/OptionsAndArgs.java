@@ -44,6 +44,7 @@ public final class OptionsAndArgs {
             //https options:
             "keystore", "keystorePassword", "useSslClientAuthentication!",
             "secureSocketProtocol", "keyStoreType", "keyManagerAlgorithm", "trustManagerAlgorithm",
+            "caCert", "serverCert", "serverKey", "serverKeyAlgorithm",
             // Jolokia options:
             "historyMaxEntries", "debug!", "debugMaxEntries",
             "dispatcherClasses", "maxDepth", "maxCollectionSize",
@@ -135,8 +136,8 @@ public final class OptionsAndArgs {
         StringBuilder arg = new StringBuilder();
         for (Map.Entry<String,String> entry : options.entrySet()) {
             String key = entry.getKey();
-            if (!entry.getKey().equals("quiet") && !entry.getKey().equals("verbose")) {
-                arg.append(entry.getKey()).append("=").append(entry.getValue()).append(",");
+            if (!key.equals("quiet") && !key.equals("verbose")) {
+                arg.append(key).append("=").append(entry.getValue()).append(",");
             }
         }
         return arg.length() > 0 ? arg.substring(0,arg.length() - 1) : "";

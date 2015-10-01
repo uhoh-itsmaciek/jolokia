@@ -24,6 +24,9 @@
   </properties>
   <body>
     <release version="1.3.2-SNAPSHOT" description="Release 1.3.2-SNAPSHOT" date="2015-05-28">
+      <action dev="roland" type="add" date="2015-10-01">
+        Support for PEM certs and keys when using the JVM agent with TLS
+      </action>
       <action dev="nevenr" type="add" date="2015-07-02" issue="199">
         Allow environment placeholders in "agentId"
       <action dev="roland" type="add" date="2015-09-11" issue="213">

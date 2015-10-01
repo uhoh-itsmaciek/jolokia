@@ -58,6 +58,10 @@ public class JolokiaServerConfig {
     private String keyManagerAlgorithm;
     private String trustManagerAlgorithm;
     private String keyStoreType;
+    private String caCert;
+    private String serverCert;
+    private String serverKey;
+    private String serverKeyAlgorithm;
 
     /**
      * Constructor which prepares the server configuration from a map
@@ -208,12 +212,53 @@ public class JolokiaServerConfig {
     }
 
     /**
-     * Password for keystore if a keystore is used. If not given, no password is assumed.
+     * Password for keystore if a keystore is used. If not given, no password is assumed. If certs are not
+     * loaded from a keystore but from PEM files directly, then this password is used for the private
+     * server key
      *
      * @return the keystore password as char array or an empty array of no password is given
      */
     public char[] getKeystorePassword() {
         return keystorePassword;
+    }
+
+    /**
+     * Get a path to a CA PEM file which is used to verify client certificates. This path
+     * is only used when {@link #getKeystore()} is not set.
+     *
+     * @return the file path where the ca cert is located.
+     */
+    public String getCaCert() {
+        return caCert;
+    }
+
+    /**
+     * Get the path to a server cert which is presented clients when using TLS.
+     * This is only used when {@link #getKeystore()} is not set.
+     *
+     * @return the file path where the server cert is located.
+     */
+    public String getServerCert() {
+        return serverCert;
+    }
+
+    /**
+     * Get the path to a the cert which has the private server key.
+     * This is only used when {@link #getKeystore()} is not set.
+     *
+     * @return the file path where the private server cert is located.
+     */
+    public String getServerKey() {
+        return serverKey;
+    }
+
+    /**
+     * The algorithm to use for extracting the private server key.
+     *
+     * @return the server keyl algoritm
+     */
+    public String getServerKeyAlgorithm() {
+        return serverKeyAlgorithm;
     }
 
     // Initialise and validate early in order to fail fast in case of an configuration error
@@ -328,9 +373,13 @@ public class JolokiaServerConfig {
     private void initHttpsRelatedSettings(Map<String, String> agentConfig) {
         // keystore
         keystore = agentConfig.get("keystore");
-        if (protocol.equals("https") && keystore == null) {
-            throw new IllegalArgumentException("No keystore defined for HTTPS protocol. " +
-                                               "Please use the 'keystore' option to point to a valid keystore");
+        caCert = agentConfig.get("caCert");
+        serverCert = agentConfig.get("serverCert");
+        serverKey = agentConfig.get("serverKey");
+
+        if (protocol.equals("https") && (keystore == null && (caCert == null || serverCert == null || serverKey == null))) {
+            throw new IllegalArgumentException("No keystore or certs defined for HTTPS protocol. " +
+                                               "Please use the 'keystore' or 'caCert/serverCert/serverKey' options to point to a valid keystore");
         }
 
         secureSocketProtocol = agentConfig.get("secureSocketProtocol");
@@ -344,6 +393,7 @@ public class JolokiaServerConfig {
         String password = agentConfig.get("keystorePassword");
         keystorePassword =  password != null ? password.toCharArray() : new char[0];
 
+        serverKeyAlgorithm = agentConfig.get("serverKeyAlgorithm");
     }
 
     private void initThreadNr(Map<String, String> agentConfig) {
@@ -361,7 +411,6 @@ public class JolokiaServerConfig {
                                                "' but most be either 'single', 'fixed' or 'cached'");
         }
     }
-
 
     private void initAddress(Map<String, String> agentConfig) {
         String host = agentConfig.get("host");

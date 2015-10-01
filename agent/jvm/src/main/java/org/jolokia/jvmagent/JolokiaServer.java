@@ -16,10 +16,11 @@ package org.jolokia.jvmagent;
  * limitations under the License.
  */
 
-import java.io.FileInputStream;
-import java.io.IOException;
+import java.io.*;
 import java.net.*;
 import java.security.*;
+import java.security.cert.CertificateException;
+import java.security.spec.InvalidKeySpecException;
 import java.util.concurrent.*;
 
 import javax.net.ssl.*;
@@ -27,6 +28,7 @@ import javax.net.ssl.*;
 import com.sun.net.httpserver.*;
 import com.sun.net.httpserver.Authenticator;
 import org.jolokia.config.ConfigKey;
+import org.jolokia.jvmagent.security.KeyStoreUtil;
 import org.jolokia.util.NetworkUtil;
 
 /**
@@ -266,23 +268,14 @@ public class JolokiaServer {
             SSLContext sslContext = SSLContext.getInstance(pConfig.getSecureSocketProtocol());
 
             // initialise the keystore
-            char[] password = pConfig.getKeystorePassword();
-            KeyStore ks = KeyStore.getInstance(pConfig.getKeyStoreType());
-            FileInputStream fis = null;
-            try {
-                fis = new FileInputStream(pConfig.getKeystore());
-                ks.load(fis, password);
-            } finally {
-                if (fis != null) {
-                    fis.close();
-                }
-            }
+            KeyStore ks = getKeyStore(pConfig);
+
             // setup the key manager factory
-            KeyManagerFactory kmf = KeyManagerFactory.getInstance(pConfig.getKeyManagerAlgorithm());
-            kmf.init(ks, password);
+            KeyManagerFactory kmf = getKeyManagerFactory(pConfig);
+            kmf.init(ks, pConfig.getKeystorePassword());
 
             // setup the trust manager factory
-            TrustManagerFactory tmf = TrustManagerFactory.getInstance(pConfig.getTrustManagerAlgorithm());
+            TrustManagerFactory tmf = getTrustManagerFactory(pConfig);
             tmf.init(ks);
 
             // setup the HTTPS context and parameters
@@ -293,6 +286,66 @@ public class JolokiaServer {
             throw new IllegalStateException("Cannot use keystore for https communication: " + e,e);
         } catch (IOException e) {
             throw new IllegalStateException("Cannot open keystore for https communication: " + e,e);
+        }
+    }
+
+    private TrustManagerFactory getTrustManagerFactory(JolokiaServerConfig pConfig) throws NoSuchAlgorithmException {
+        String algo = pConfig.getTrustManagerAlgorithm();
+        return TrustManagerFactory.getInstance(algo != null ? algo : TrustManagerFactory.getDefaultAlgorithm());
+    }
+
+    private KeyManagerFactory getKeyManagerFactory(JolokiaServerConfig pConfig) throws NoSuchAlgorithmException {
+        String algo = pConfig.getKeyManagerAlgorithm();
+        return KeyManagerFactory.getInstance(algo != null ? algo : KeyManagerFactory.getDefaultAlgorithm());
+    }
+
+    private KeyStore getKeyStore(JolokiaServerConfig pConfig) throws KeyStoreException, IOException,
+                                                                     NoSuchAlgorithmException, CertificateException,
+                                                                     InvalidKeySpecException {
+        char[] password = pConfig.getKeystorePassword();
+        String keystoreFile = pConfig.getKeystore();
+        KeyStore keystore = KeyStore.getInstance(pConfig.getKeyStoreType());
+        if (keystoreFile != null) {
+            loadKeyStoreFromFile(keystore, keystoreFile, password);
+        } else {
+            keystore.load(null);
+            updateKeyStoreFromPEM(keystore,pConfig);
+        }
+        return keystore;
+    }
+
+    private void updateKeyStoreFromPEM(KeyStore keystore, JolokiaServerConfig pConfig)
+            throws IOException, CertificateException, NoSuchAlgorithmException, KeyStoreException, InvalidKeySpecException {
+        File caCert = getAndValidateFile(pConfig.getCaCert());
+        File serverCert = getAndValidateFile(pConfig.getServerCert());
+        File serverKey = getAndValidateFile(pConfig.getServerKey());
+
+        KeyStoreUtil.updateWithCaPem(keystore, caCert);
+        KeyStoreUtil.updateWithServerPems(keystore, serverCert, serverKey,
+                                          pConfig.getServerKeyAlgorithm(), pConfig.getKeystorePassword());
+    }
+
+    private File getAndValidateFile(String file) throws IOException {
+        File ret = new File(file);
+        if (!ret.exists()) {
+            throw new FileNotFoundException("No such cert file " + file);
+        }
+        if (!ret.canRead()) {
+            throw new IOException("Cert file " + file + " is not readable");
+        }
+        return ret;
+    }
+
+    private void loadKeyStoreFromFile(KeyStore pKeyStore, String pFile, char[] pPassword)
+            throws KeyStoreException, IOException, NoSuchAlgorithmException, CertificateException {
+        FileInputStream fis = null;
+        try {
+            fis = new FileInputStream(pFile);
+            pKeyStore.load(fis, pPassword);
+        } finally {
+            if (fis != null) {
+                fis.close();
+            }
         }
     }
 
