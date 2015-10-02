@@ -91,7 +91,7 @@ public class KeyStoreUtil {
         }
     }
 
-    // This method is enspired and partly taken from
+    // This method is inspired and partly taken over from
     // http://oauth.googlecode.com/svn/code/java/
     // All credits to belong to them.
     private static byte[] decodePem(File pemFile) throws IOException {

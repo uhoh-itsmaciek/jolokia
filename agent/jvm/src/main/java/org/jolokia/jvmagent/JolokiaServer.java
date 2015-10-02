@@ -28,6 +28,8 @@ import javax.net.ssl.*;
 import com.sun.net.httpserver.*;
 import com.sun.net.httpserver.Authenticator;
 import org.jolokia.config.ConfigKey;
+import org.jolokia.jvmagent.handler.JolokiaHttpHandler;
+import org.jolokia.jvmagent.handler.JolokiaHttpsHandler;
 import org.jolokia.jvmagent.security.KeyStoreUtil;
 import org.jolokia.util.NetworkUtil;
 
@@ -184,7 +186,9 @@ public class JolokiaServer {
 
         // Create proper context along with handler
         final String contextPath = pConfig.getContextPath();
-        jolokiaHttpHandler = new JolokiaHttpHandler(pConfig.getJolokiaConfig());
+        jolokiaHttpHandler = useHttps(pConfig) ?
+                new JolokiaHttpsHandler(pConfig) :
+                new JolokiaHttpHandler(pConfig.getJolokiaConfig());
         HttpContext context = pServer.createContext(contextPath, jolokiaHttpHandler);
 
         // Add authentication if configured
@@ -234,11 +238,9 @@ public class JolokiaServer {
     private HttpServer createHttpServer(JolokiaServerConfig pConfig) throws IOException {
         int port = pConfig.getPort();
         InetAddress address = pConfig.getAddress();
-        String protocol = pConfig.getProtocol();
         InetSocketAddress socketAddress = new InetSocketAddress(address,port);
 
-        HttpServer server =
-                protocol.equalsIgnoreCase("https") ?
+        HttpServer server = useHttps(pConfig) ?
                         createHttpsServer(socketAddress, pConfig) :
                         HttpServer.create(socketAddress, pConfig.getBacklog());
 
@@ -257,9 +259,13 @@ public class JolokiaServer {
         return server;
     }
 
-
     // =========================================================================================================
     // HTTPS handling
+
+    private boolean useHttps(JolokiaServerConfig pConfig) {
+        String protocol = pConfig.getProtocol();
+        return protocol.equalsIgnoreCase("https");
+    }
 
     private HttpServer createHttpsServer(InetSocketAddress pSocketAddress,JolokiaServerConfig pConfig) {
         // initialise the HTTPS server

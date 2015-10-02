@@ -62,6 +62,7 @@ public class JolokiaServerConfig {
     private String serverCert;
     private String serverKey;
     private String serverKeyAlgorithm;
+    private List<String> clientPrincipals;
 
     /**
      * Constructor which prepares the server configuration from a map
@@ -394,11 +395,29 @@ public class JolokiaServerConfig {
         keystorePassword =  password != null ? password.toCharArray() : new char[0];
 
         serverKeyAlgorithm = agentConfig.get("serverKeyAlgorithm");
+        clientPrincipals = extractList(agentConfig,"clientPrincipal");
     }
 
-    private void initThreadNr(Map<String, String> agentConfig) {
+    // Extract list from multiple string entries. <code>null</code> if no such config is given
+    // The first element is one without extensions
+    // More elements can be given with ".1", ".2", ... added.
+    private List<String> extractList(Map<String, String> pAgentConfig, String pKey) {
+        List<String> ret = new ArrayList<String>();
+        if (pAgentConfig.containsKey(pKey)) {
+            ret.add(pAgentConfig.get(pKey));
+        }
+        int idx = 1;
+        String keyIdx = pKey + "." + idx;
+        while (pAgentConfig.containsKey(keyIdx)) {
+            ret.add(pAgentConfig.get(keyIdx));
+            keyIdx = pKey + "." + ++idx;
+        }
+        return ret.size() > 0 ? ret : null;
+    }
+
+    private void initThreadNr(Map<String, String> pAgentConfig) {
         // Thread-Nr
-        String threadNrS =  agentConfig.get("threadNr");
+        String threadNrS =  pAgentConfig.get("threadNr");
         threadNr = threadNrS != null ? Integer.parseInt(threadNrS) : 5;
     }
 
@@ -468,5 +487,9 @@ public class JolokiaServerConfig {
 
     public String getKeyStoreType() {
         return keyStoreType;
+    }
+
+    public List<String> getClientPrincipals() {
+        return clientPrincipals;
     }
 }

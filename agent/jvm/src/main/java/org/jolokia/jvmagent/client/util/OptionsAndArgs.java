@@ -21,6 +21,8 @@ import java.net.URISyntaxException;
 import java.util.*;
 import java.util.regex.*;
 
+import org.jolokia.util.EscapeUtil;
+
 /**
  * Class representing options and arguments known to the client launcher. It also knows how
  * to parse the command line.
@@ -44,7 +46,7 @@ public final class OptionsAndArgs {
             //https options:
             "keystore", "keystorePassword", "useSslClientAuthentication!",
             "secureSocketProtocol", "keyStoreType", "keyManagerAlgorithm", "trustManagerAlgorithm",
-            "caCert", "serverCert", "serverKey", "serverKeyAlgorithm",
+            "caCert", "serverCert", "serverKey", "serverKeyAlgorithm", "clientPrincipal",
             // Jolokia options:
             "historyMaxEntries", "debug!", "debugMaxEntries",
             "dispatcherClasses", "maxDepth", "maxCollectionSize",
@@ -53,6 +55,9 @@ public final class OptionsAndArgs {
             "discoveryEnabled", "discoveryAgentUrl", "agentId", "agentDescription",
             // Others:
             "config", "help!"));
+
+    private static final Set<String> LIST_OPTIONS = new HashSet<String>(Arrays.asList(
+            "clientPrincipal"));
 
     static {
         String shortOptsDef[] = {
@@ -115,7 +120,10 @@ public final class OptionsAndArgs {
                 if (argParsed.skipNext) {
                     i++;
                 }
-                options.put(argParsed.option, argParsed.value);
+                String optionsKey =
+                        argParsed.option  +
+                        (LIST_OPTIONS.contains(argParsed.option) ? getNextListIndexSuffix(options, argParsed.option) : "");
+                options.put(optionsKey, argParsed.value);
             }  else {
                 arguments.add(arg);
             }
@@ -125,7 +133,6 @@ public final class OptionsAndArgs {
 
         init(pCommands, pidArg);
     }
-
 
     /**
      * Convert options to agent readable options (i.e. a single string with options separated by commas)
@@ -137,7 +144,7 @@ public final class OptionsAndArgs {
         for (Map.Entry<String,String> entry : options.entrySet()) {
             String key = entry.getKey();
             if (!key.equals("quiet") && !key.equals("verbose")) {
-                arg.append(key).append("=").append(entry.getValue()).append(",");
+                arg.append(key).append("=").append(EscapeUtil.escape(entry.getValue(),EscapeUtil.CSV_ESCAPE,",")).append(",");
             }
         }
         return arg.length() > 0 ? arg.substring(0,arg.length() - 1) : "";
@@ -265,6 +272,19 @@ public final class OptionsAndArgs {
             return new ArgParsed(opt,"true",false);
         } else {
             throw new IllegalArgumentException("Unknown option '" + opt + "'");
+        }
+    }
+
+    // check for the next key with a suffix like ".1" which is not already set
+    private String getNextListIndexSuffix(Map<String, String> options, String key) {
+        if (!options.containsKey(key)) {
+            return "";
+        } else {
+            int i = 1;
+            while (options.containsKey(key + "." + i)) {
+                i++;
+            }
+            return "." + i;
         }
     }
 
